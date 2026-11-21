@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from db import get_connection
 
 app = FastAPI(title="Barbería Citas")
@@ -16,8 +17,10 @@ app.add_middleware(
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 @app.get("/")
-def inicio():
-    return {"estado": "ok", "mensaje": "API de Barbería funcionando"}
+def servir_frontend():
+    return FileResponse("frontend/index.html")
+
+
 
 
 @app.get("/test-db")
