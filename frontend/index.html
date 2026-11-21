@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barbería - Agendar Cita</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        body {
+            background-color: #121212;
+            color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            padding: 16px;
+        }
+        .app-container {
+            width: 100%;
+            max-width: 420px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        header {
+            text-align: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #2c2c2c;
+        }
+        header h1 {
+            font-size: 1.4rem;
+            color: #d4af37;
+        }
+        .card {
+            background-color: #1e1e1e;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid #2e2e2e;
+        }
+        h2 {
+            font-size: 1.1rem;
+            margin-bottom: 12px;
+            color: #e0e0e0;
+        }
+        .form-group {
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        label {
+            font-size: 0.85rem;
+            color: #aaaaaa;
+        }
+        input, select {
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #3a3a3a;
+            background-color: #2a2a2a;
+            color: #ffffff;
+            font-size: 1rem;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 6px;
+        }
+        .btn-primary {
+            background-color: #d4af37;
+            color: #121212;
+        }
+        .btn-primary:active {
+            opacity: 0.85;
+        }
+        .btn-cancel {
+            background-color: #b91c1c;
+            color: #ffffff;
+            padding: 8px;
+            font-size: 0.85rem;
+            margin-top: 8px;
+        }
+        .mensaje {
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            display: none;
+        }
+        .mensaje.ok {
+            display: block;
+            background-color: #14532d;
+            color: #bbf7d0;
+        }
+        .mensaje.error {
+            display: block;
+            background-color: #7f1d1d;
+            color: #fecaca;
+        }
+        .cita-item {
+            background-color: #262626;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #d4af37;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+        .cita-item.cancelada {
+            border-left-color: #7f1d1d;
+            opacity: 0.65;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            background-color: #333333;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Barbería - Citas</h1>
+        </header>
+
+        <!-- Formulario para agendar -->
+        <section class="card">
+            <h2>Nueva Cita</h2>
+            <form id="form-cita">
+                <div class="form-group">
+                    <label for="cliente_nombre">Tu Nombre</label>
+                    <input type="text" id="cliente_nombre" placeholder="Ej: Carlos Pérez" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="cliente_telefono">Teléfono</label>
+                    <input type="tel" id="cliente_telefono" placeholder="Ej: 0991234567" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="barbero_id">Barbero</label>
+                    <select id="barbero_id" required>
+                        <option value="">Cargando barberos...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="servicio_id">Servicio</label>
+                    <select id="servicio_id" required>
+                        <option value="">Cargando servicios...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="fecha">Fecha</label>
+                    <input type="date" id="fecha" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="hora_inicio">Hora de inicio</label>
+                    <input type="time" id="hora_inicio" required>
+                </div>
+
+                <button type="submit" class="btn-primary">Agendar Cita</button>
+            </form>
+            <div id="feedback" class="mensaje"></div>
+        </section>
+
+        <!-- Lista de citas -->
+        <section class="card">
+            <h2>Citas Agendadas</h2>
+            <div id="lista-citas">Cargando citas...</div>
+        </section>
+    </div>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000";
+
+        // Cargar barberos y servicios al iniciar
+        async function cargarCatalogos() {
+            try {
+                const [resBarberos, resServicios] = await Promise.all([
+                    fetch(`${API_URL}/barberos`),
+                    fetch(`${API_URL}/servicios`)
+                ]);
+
+                const barberos = await resBarberos.json();
+                const servicios = await resServicios.json();
+
+                const selectBarbero = document.getElementById("barbero_id");
+                selectBarbero.innerHTML = barberos.map(b =>
+                   `<option value="${b.id}">${b.nombre}${b.especialidad ? ` — ${b.especialidad}` : ""}</option>`
+                ).join("");
+
+                const selectServicio = document.getElementById("servicio_id");
+                selectServicio.innerHTML = servicios.map(s =>
+                    `<option value="${s.id}">${s.nombre} (${s.duracion_minutos} min - $${s.precio})</option>`
+                ).join("");
+            } catch (err) {
+                mostrarMensaje("Error conectando con el servidor. Verifica que Uvicorn esté corriendo.", true);
+            }
+        }
+
+        function formatearHora(valor) {
+            if (valor === null || valor === undefined) return "--:--";
+
+            if (typeof valor === "number") {
+                const totalMinutos = Math.floor(valor / 60);
+                const horas = Math.floor(totalMinutos / 60) % 24;
+                const minutos = totalMinutos % 60;
+                return `${String(horas).padStart(2, "0")}:${String(minutos).padStart(2, "0")}`;
+            }
+
+            return String(valor).slice(0, 5);
+        }
+
+        // Cargar listado de citas
+        async function cargarCitas() {
+            const contenedor = document.getElementById("lista-citas");
+            try {
+                const res = await fetch(`${API_URL}/citas`);
+                const citas = await res.json();
+
+                if (!citas.length) {
+                    contenedor.innerHTML = "<p style='color:#888;'>No hay citas registradas aún.</p>";
+                    return;
+                }
+
+                contenedor.innerHTML = citas.map(c => {
+                    const esCancelada = c.estado === "cancelada";
+                    const horaInicio = formatearHora(c.hora_inicio);
+                    const horaFin = formatearHora(c.hora_fin);
+
+                    return `
+                        <div class="cita-item ${esCancelada ? 'cancelada' : ''}">
+                            <div><strong>#${c.id} - ${c.cliente || 'Cliente'}</strong> <span class="badge">${c.estado}</span></div>
+                            <div>Barbero: ${c.barbero || ''} | Servicio: ${c.servicio || ''}</div>
+                            <div>Fecha: ${c.fecha} | Hora: ${horaInicio} - ${horaFin}</div>
+                            ${!esCancelada ? `<button class="btn-cancel" onclick="cancelarCita(${c.id})">Cancelar Cita</button>` : ""}
+                        </div>
+                    `;
+                }).join("");
+            } catch (err) {
+                contenedor.innerHTML = "<p style='color:#f87171;'>No se pudieron cargar las citas.</p>";
+            }
+        }
+
+        // Enviar nueva cita
+        document.getElementById("form-cita").addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const payload = {
+                cliente_nombre: document.getElementById("cliente_nombre").value.trim(),
+                cliente_telefono: document.getElementById("cliente_telefono").value.trim(),
+                barbero_id: parseInt(document.getElementById("barbero_id").value),
+                servicio_id: parseInt(document.getElementById("servicio_id").value),
+                fecha: document.getElementById("fecha").value,
+                hora_inicio: document.getElementById("hora_inicio").value
+            };
+
+            try {
+                const res = await fetch(`${API_URL}/citas`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (data.error) {
+                    mostrarMensaje(data.error, true);
+                } else {
+                    mostrarMensaje(data.mensaje || "Cita agendada con éxito", false);
+                    document.getElementById("form-cita").reset();
+                    cargarCitas();
+                }
+            } catch (err) {
+                mostrarMensaje("Error al enviar la cita al servidor.", true);
+            }
+        });
+
+        // Cancelar cita existente
+        async function cancelarCita(citaId) {
+            try {
+                const res = await fetch(`${API_URL}/citas/${citaId}/estado`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ estado: "cancelada" })
+                });
+                const data = await res.json();
+                if (data.error) {
+                    mostrarMensaje(data.error, true);
+                } else {
+                    mostrarMensaje(`Cita #${citaId} cancelada.`, false);
+                    cargarCitas();
+                }
+            } catch (err) {
+                mostrarMensaje("Error al cancelar la cita.", true);
+            }
+        }
+
+        function mostrarMensaje(texto, esError) {
+            const box = document.getElementById("feedback");
+            box.textContent = texto;
+            box.className = `mensaje ${esError ? 'error' : 'ok'}`;
+        }
+
+        // Inicializar pantalla
+        cargarCatalogos();
+        cargarCitas();
+    </script>
+</body>
+</html>
