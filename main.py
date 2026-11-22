@@ -137,7 +137,7 @@ def inicializar_bd():
 
     conn.commit()
     cursor.close()
-    conn.close()S
+    conn.close()
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 @app.get("/")
