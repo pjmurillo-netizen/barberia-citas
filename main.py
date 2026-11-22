@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from db import get_connection
+from pathlib import Path
+from fastapi.responses import FileResponse
 
 app = FastAPI(title="Barbería Citas")
 
@@ -140,9 +142,11 @@ def inicializar_bd():
     conn.close()
 from datetime import datetime, timedelta
 from pydantic import BaseModel
+BASE_DIR = Path(__file__).resolve().parent
+
 @app.get("/")
-def inicio():
-    return {"estado": "ok", "mensaje": "API de Barbería funcionando"}
+def mostrar_interfaz():
+    return FileResponse(BASE_DIR / "frontend" / "index.html")
 
 
 @app.get("/test-db")
