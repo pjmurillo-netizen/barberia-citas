@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
 from db import get_connection
 
 app = FastAPI(title="Barbería Citas")
@@ -13,14 +12,137 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+@app.on_event("startup")
+def inicializar_bd():
+    conn = get_connection()
+    cursor = conn.cursor()
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS barberos (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          nombre VARCHAR(100) NOT NULL,
+          especialidad VARCHAR(120) DEFAULT NULL,
+          activo TINYINT(1) NOT NULL DEFAULT 1
+        );
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS horarios_barbero (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          barbero_id INT NOT NULL,
+          dia_semana TINYINT NOT NULL,
+          hora_inicio TIME NOT NULL,
+          hora_fin TIME NOT NULL,
+          CONSTRAINT fk_horario_barbero
+            FOREIGN KEY (barbero_id) REFERENCES barberos(id)
+            ON DELETE CASCADE
+        );
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS bloqueos_horario (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          barbero_id INT NOT NULL,
+          fecha DATE NOT NULL,
+          hora_inicio TIME NOT NULL,
+          hora_fin TIME NOT NULL,
+          motivo VARCHAR(150) DEFAULT NULL,
+          CONSTRAINT fk_bloqueo_barbero
+            FOREIGN KEY (barbero_id) REFERENCES barberos(id)
+            ON DELETE CASCADE
+        );
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS servicios (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          nombre VARCHAR(100) NOT NULL,
+          duracion_minutos INT NOT NULL,
+          precio DECIMAL(10, 2) NOT NULL,
+          activo TINYINT(1) NOT NULL DEFAULT 1
+        );
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS clientes (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          nombre VARCHAR(100) NOT NULL,
+          telefono VARCHAR(30) NOT NULL,
+          correo VARCHAR(120) DEFAULT NULL
+        );
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS citas (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          barbero_id INT NOT NULL,
+          servicio_id INT NOT NULL,
+          cliente_id INT NOT NULL,
+          fecha DATE NOT NULL,
+          hora_inicio TIME NOT NULL,
+          hora_fin TIME NOT NULL,
+          estado VARCHAR(20) NOT NULL DEFAULT 'confirmada',
+          notas VARCHAR(255) DEFAULT NULL,
+          CONSTRAINT fk_cita_barbero
+            FOREIGN KEY (barbero_id) REFERENCES barberos(id),
+          CONSTRAINT fk_cita_servicio
+            FOREIGN KEY (servicio_id) REFERENCES servicios(id),
+          CONSTRAINT fk_cita_cliente
+            FOREIGN KEY (cliente_id) REFERENCES clientes(id)
+        );
+    """)
+
+    cursor.execute("SELECT COUNT(*) FROM barberos;")
+    if cursor.fetchone()[0] == 0:
+        cursor.executemany(
+            "INSERT INTO barberos (nombre, especialidad, activo) VALUES (%s, %s, %s);",
+            [
+                ("Carlos Vera", "Degradados y barba", 1),
+                ("Mateo Mendoza", "Colorimetría y rayitos", 1),
+                ("Pablo Murillo", "Degradados y barba", 1),
+                ("Tony Quimis", "Colorimetría y rayitos", 1),
+            ],
+        )
+
+    cursor.execute("SELECT COUNT(*) FROM servicios;")
+    if cursor.fetchone()[0] == 0:
+        cursor.executemany(
+            "INSERT INTO servicios (nombre, duracion_minutos, precio, activo) VALUES (%s, %s, %s, %s);",
+            [
+                ("Corte clásico / fade", 30, 8.00, 1),
+                ("Perfilado de barba", 20, 5.00, 1),
+                ("Rayitos / iluminación", 60, 20.00, 1),
+            ],
+        )
+
+    cursor.execute("SELECT COUNT(*) FROM horarios_barbero;")
+    if cursor.fetchone()[0] == 0:
+        cursor.executemany(
+            "INSERT INTO horarios_barbero (barbero_id, dia_semana, hora_inicio, hora_fin) VALUES (%s, %s, %s, %s);",
+            [
+                (1, 0, "09:00:00", "19:00:00"),
+                (1, 1, "09:00:00", "19:00:00"),
+                (1, 2, "09:00:00", "19:00:00"),
+                (1, 3, "09:00:00", "19:00:00"),
+                (1, 4, "09:00:00", "19:00:00"),
+                (1, 5, "09:00:00", "18:00:00"),
+                (2, 0, "10:00:00", "19:00:00"),
+                (2, 1, "10:00:00", "19:00:00"),
+                (2, 2, "10:00:00", "19:00:00"),
+                (2, 3, "10:00:00", "19:00:00"),
+                (2, 4, "10:00:00", "19:00:00"),
+                (2, 5, "10:00:00", "18:00:00"),
+            ],
+        )
+
+    conn.commit()
+    cursor.close()
+    conn.close()S
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 @app.get("/")
-def servir_frontend():
-    return FileResponse("frontend/index.html")
-
-
+def inicio():
+    return {"estado": "ok", "mensaje": "API de Barbería funcionando"}
 
 
 @app.get("/test-db")
